@@ -1,16 +1,54 @@
 import { useNavigation } from "@react-navigation/native";
-import { View,Text, ScrollView } from "react-native"
+import {useState,useEffect} from 'react';
+import { View,Text, ScrollView, Alert } from "react-native"
 import { HabitDay,DAY_SIZE } from "../components/HabitDay"
 import { Header } from "../components/Header"
+import { Loading } from "../components/Loading"
 import {generateRangeDatesFromYearStart} from "../utils/generate-dates-from-year-start";
+import {api} from '../lib/axios'
+import dayjs from "dayjs";
 
 const weekDays = ['D','S','T','Q','Q','S','S']
 const DatesFromYearStart = generateRangeDatesFromYearStart();
 const minimumSummaryDatesSizes = 18 * 5
 const amountOfDaysToFill = minimumSummaryDatesSizes - DatesFromYearStart.length;
 
+type SummaryProps = Array<{
+    id:string;
+    date:string;
+    amount:number;
+    completed:number;
+}>
+
 export function Home() {
     const {navigate} = useNavigation();
+    const[loading ,setLoading] = useState(true)
+    const[summary,setSummary] = useState<SummaryProps | null>(null)
+    async function fetchData() {
+        try{
+            setLoading(true)
+            const response = await api.get('/summary')
+            console.log(response.data)
+            setSummary(response.data)
+
+        }catch(error){
+            console.error(error);
+            Alert.alert('Ops', 'Não foi possível carregar os hábitos.');
+          }finally{
+            setLoading(false)
+        }
+    }
+
+    useEffect(()=>{
+        fetchData();
+    },[])
+
+    if(loading){
+        return(
+            <Loading/>
+        )
+    }
+
     return(
         <View className=" flex-1 bg-background px-8 pt-16">
             <Header/>
@@ -23,11 +61,17 @@ export function Home() {
                 }
             </View>
             <ScrollView showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingBottom:100}}>
-            <View className="flex-row flex-wrap">
+            {   summary && 
+                <View className="flex-row flex-wrap">
             {
-                DatesFromYearStart.map(date =>(
-                    <HabitDay key={date.toISOString()} onPress={()=> navigate('habit',{date:date.toISOString()})}/>
-                ))
+                DatesFromYearStart.map(date =>{
+                    const dayWithHabits = summary.find(day=>{
+                        return dayjs(date).isSame(day.date, 'day')
+                    })
+
+                    return(
+                    <HabitDay date={date} amountOfHabits={dayWithHabits?.amount} amountCompleted={dayWithHabits?.completed} key={date.toISOString()} onPress={()=> navigate('habit',{date:date.toISOString()})}/>
+                )})
             }
 
             {
@@ -37,7 +81,7 @@ export function Home() {
             ))
             }
 
-            </View>
+            </View>}
             </ScrollView>
         </View>
     )    
